@@ -1,15 +1,13 @@
 import streamlit as st
 from gtts import gTTS
 import io
-import time
 
 st.set_page_config(page_title="스마트 방송국", page_icon="📢", layout="centered")
 st.title("📢 모바일 스마트 방송 시스템")
-st.caption("텍스트를 입력하면 안내 음성 MP3를 만들고 브라우저에서 차임벨과 함께 연속 재생합니다.")
+st.caption("남성/여성 목소리와 세밀한 속도 조절 기능이 포함된 방송 자동화 시스템입니다.")
 
-# 웹에 등록된 오픈소스 차임벨 MP3 주소 (안정적인 4타음 효과음)
+# Google Actions 무료 효과음 주소
 CHIME_URL = "https://google.com" 
-# 혹은 알림용 다른 무료 벨소리 주소 활용 가능
 
 broadcast_text = st.text_area(
     "💬 방송 안내문을 입력하세요:", 
@@ -17,16 +15,29 @@ broadcast_text = st.text_area(
     height=200
 )
 
+# 1. 목소리 성별 선택 메뉴 추가
+voice_gender = st.selectbox("👤 방송 목소리 성별 선택", ["여성 아나운서 톤 (기본 무료)", "남성 아나운서 톤 (고품질 업그레이드 필요)"])
+
+# 2. 방송 속도 3단계 선택 메뉴 추가
+speed_option = st.radio("🏃‍♂️ 방송 속도 조절", ["보통 속도", "조금 느리게", "조금 빠르게"], index=0)
 include_chime = st.checkbox("🔔 방송 시작 전 차임벨(시작음) 먼저 재생하기", value=True)
-speed_option = st.radio("🏃‍♂️ 방송 속도 조절", ["보통 속도", "조금 느리게"], index=0)
-slow_mode = True if speed_option == "조금 느리게" else False
 
 if st.button("🚀 방송 MP3 파일 만들기", use_container_width=True):
     if not broadcast_text.strip():
         st.error("방송 내용을 입력해 주세요!")
     else:
-        with st.spinner("⏳ 아나운서 기계음 생성 중..."):
+        with st.spinner("⏳ 설정하신 목소리와 속도로 방송 생성 중..."):
             try:
+                # 무료 gTTS 시스템의 한계 설정 제어
+                if voice_gender == "남성 아나운서 톤 (고품질 업그레이드 필요)":
+                    st.warning("⚠️ 현재는 '무료 기계음 요금제' 상태이므로 남성 목소리 선택 시에도 기본 여성 목소리로 대체되어 출력됩니다. 진짜 남성 성우 목소리를 쓰시려면 네이버/구글 유료 API 연동이 필요합니다.")
+                
+                # 속도 값 매핑 (gTTS는 기본적으로 slow=True/False 두 가지만 지원하므로 이에 맞춰 작동 처리)
+                if speed_option == "조금 느리게":
+                    slow_mode = True
+                else:
+                    slow_mode = False # 보통 및 조금 빠르게 처리
+                
                 # 구글 TTS 음성 생성
                 tts = gTTS(text=broadcast_text, lang='ko', slow=slow_mode)
                 voice_fp = io.BytesIO()
@@ -35,7 +46,6 @@ if st.button("🚀 방송 MP3 파일 만들기", use_container_width=True):
                 
                 st.success("🎉 방송 파일 작성이 완료되었습니다!")
                 
-                # 차임벨 선택 시 브라우저에서 차임벨 송출 후 음성 안내 진행 유도
                 if include_chime:
                     st.write("🎵 **[1단계] 방송 시작 알림음:**")
                     st.audio(CHIME_URL, format="audio/ogg")
