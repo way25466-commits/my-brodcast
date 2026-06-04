@@ -4,9 +4,9 @@ import io
 
 st.set_page_config(page_title="스마트 방송국", page_icon="📢", layout="centered")
 st.title("📢 모바일 스마트 방송 시스템")
-st.caption("남성/여성 목소리와 세밀한 속도 조절 기능이 포함된 방송 자동화 시스템입니다.")
+st.caption("안정적인 오디오 스트리밍 기능이 반영된 무료 방송 자동화 버전입니다.")
 
-# Google Actions 무료 효과음 주소
+# Google Actions에서 제공하는 기본 안내 방송용 알림음 주소
 CHIME_URL = "https://google.com" 
 
 broadcast_text = st.text_area(
@@ -15,52 +15,49 @@ broadcast_text = st.text_area(
     height=200
 )
 
-# 1. 목소리 성별 선택 메뉴 추가
-voice_gender = st.selectbox("👤 방송 목소리 성별 선택", ["여성 아나운서 톤 (기본 무료)", "남성 아나운서 톤 (고품질 업그레이드 필요)"])
-
-# 2. 방송 속도 3단계 선택 메뉴 추가
-speed_option = st.radio("🏃‍♂️ 방송 속도 조절", ["보통 속도", "조금 느리게", "조금 빠르게"], index=0)
+# 1. 속도 옵션 제공
+speed_option = st.radio("🏃‍♂️ 방송 속도 조절", ["보통 속도", "조금 느리게"], index=0)
 include_chime = st.checkbox("🔔 방송 시작 전 차임벨(시작음) 먼저 재생하기", value=True)
 
 if st.button("🚀 방송 MP3 파일 만들기", use_container_width=True):
     if not broadcast_text.strip():
         st.error("방송 내용을 입력해 주세요!")
     else:
-        with st.spinner("⏳ 설정하신 목소리와 속도로 방송 생성 중..."):
+        with st.spinner("⏳ 목소리 파일 생성 중..."):
             try:
-                # 무료 gTTS 시스템의 한계 설정 제어
-                if voice_gender == "남성 아나운서 톤 (고품질 업그레이드 필요)":
-                    st.warning("⚠️ 현재는 '무료 기계음 요금제' 상태이므로 남성 목소리 선택 시에도 기본 여성 목소리로 대체되어 출력됩니다. 진짜 남성 성우 목소리를 쓰시려면 네이버/구글 유료 API 연동이 필요합니다.")
+                # 속도 모드 변환 설정
+                slow_mode = True if speed_option == "조금 느리게" else False
                 
-                # 속도 값 매핑 (gTTS는 기본적으로 slow=True/False 두 가지만 지원하므로 이에 맞춰 작동 처리)
-                if speed_option == "조금 느리게":
-                    slow_mode = True
+                # 구글 음성 생성 엔진 안전 모드 가동
+                tts = gTTS(text=broadcast_text.strip(), lang='ko', slow=slow_mode)
+                
+                # 메모리 버퍼 안정화 후 데이터 추출
+                mp3_fp = io.BytesIO()
+                tts.write_to_fp(mp3_fp)
+                mp3_bytes = mp3_fp.getvalue()
+                
+                if len(mp3_bytes) == 0:
+                    st.error("음성 데이터를 생성하지 못했습니다. 다시 시도해 주세요.")
                 else:
-                    slow_mode = False # 보통 및 조금 빠르게 처리
-                
-                # 구글 TTS 음성 생성
-                tts = gTTS(text=broadcast_text, lang='ko', slow=slow_mode)
-                voice_fp = io.BytesIO()
-                tts.write_to_fp(voice_fp)
-                voice_bytes = voice_fp.getvalue()
-                
-                st.success("🎉 방송 파일 작성이 완료되었습니다!")
-                
-                if include_chime:
-                    st.write("🎵 **[1단계] 방송 시작 알림음:**")
-                    st.audio(CHIME_URL, format="audio/ogg")
-                    st.write("🗣️ **[2단계] 실제 안내 방송 내용:**")
-                
-                # 본문 안내방송 오디오 플레이어
-                st.audio(voice_bytes, format="audio/mp3")
-                
-                # 다운로드 버튼
-                st.download_button(
-                    label="📥 스마트폰에 방송 MP3 다운로드하기",
-                    data=voice_bytes,
-                    file_name="스마트_모바일_방송.mp3",
-                    mime="audio/mp3",
-                    use_container_width=True
-                )
+                    st.success("🎉 방송 파일 작성이 완료되었습니다!")
+                    
+                    # 차임벨 선택 시 브라우저에서 차임벨 우선 노출
+                    if include_chime:
+                        st.write("🎵 **[1단계] 방송 시작 알림음:**")
+                        st.audio(CHIME_URL, format="audio/ogg")
+                        st.write("🗣️ **[2단계] 실제 안내 방송 내용:**")
+                    
+                    # 안전하게 음성 플레이어 출력
+                    st.audio(mp3_bytes, format="audio/mp3")
+                    
+                    # 다운로드 버튼 제공
+                    st.download_button(
+                        label="📥 스마트폰에 방송 MP3 다운로드하기",
+                        data=mp3_bytes,
+                        file_name="스마트_모바일_방송.mp3",
+                        mime="audio/mp3",
+                        use_container_width=True
+                    )
             except Exception as e:
-                st.error(f"오류가 발생했습니다: {e}")
+                st.error(f"오디오 변환 중 서버 통신 에러가 발생했습니다: {e}")
+                st.info("방송 내용 문장 끝에 마침표(.)를 명확히 찍어 주시거나 텍스트 길이를 조금 줄여서 다시 시도해 보세요.")
